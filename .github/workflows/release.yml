@@ -1,9 +1,13 @@
 name: Release
 
-# Push a tag like v0.4.0 and this builds blockermd.zip and publishes a
-# GitHub release. Every site running BlockerMD then sees the update in
-# wp-admin within about 6 hours.
+# Two ways to ship a version (bump Version: in 0-blockermd/blockermd.php first):
+#   1. On GitHub: Releases → Draft a new release → tag vX.Y.Z → Publish.
+#   2. From git: push a tag like v0.4.0.
+# Either way this builds blockermd.zip and attaches it to the release.
+# Every site running BlockerMD then sees the update in wp-admin within ~6 hours.
 on:
+  release:
+    types: [published]
   push:
     tags: ['v*.*.*']
 
@@ -13,15 +17,19 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Check the tag matches the plugin version
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
           VER=$(grep -m1 -oP "Version:\s*\K[0-9.]+" 0-blockermd/blockermd.php)
           echo "tag=$TAG plugin=$VER"
-          [ "$TAG" = "$VER" ] || { echo "Tag v$TAG does not match plugin Version $VER"; exit 1; }
+          [ "${TAG#v}" = "$VER" ] || { echo "Tag $TAG does not match plugin Version $VER"; exit 1; }
 
       - name: Lint PHP
         run: find 0-blockermd -name '*.php' -print0 | xargs -0 -n1 php -l
@@ -29,7 +37,10 @@ jobs:
       - name: Build blockermd.zip
         run: zip -r blockermd.zip 0-blockermd -x '*.DS_Store'
 
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" blockermd.zip --title "BlockerMD $GITHUB_REF_NAME" --generate-notes
+      - name: Attach to release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" blockermd.zip --clobber
+          else
+            gh release create "$TAG" blockermd.zip --title "BlockerMD $TAG" --generate-notes
+          fi

@@ -17,9 +17,9 @@ define( 'BLOCKERMD_UPDATE_REPO', 'owner/blockermd' );
 Updates then show in wp-admin like any other plugin.
 
 ## Releasing
-1. Bump `Version:` and `BLOCKERMD_VERSION` in `0-blockermd/blockermd.php`.
-2. Commit, then tag and push: `git tag v0.4.0 && git push --tags`.
-3. The Release workflow checks the tag matches the version, lints the PHP, builds `blockermd.zip` and publishes the release.
+1. Bump `Version:` and `BLOCKERMD_VERSION` in `0-blockermd/blockermd.php` and commit.
+2. On GitHub: Releases → Draft a new release → new tag `vX.Y.Z` → Publish (or push the tag from git).
+3. The Release workflow checks the tag matches the version, lints the PHP, builds `blockermd.zip` and attaches it to the release.
 
 ## License
 GPL-2.0-or-later.
