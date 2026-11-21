@@ -15,6 +15,7 @@ delete_option( 'blockermd_db_version' );
 delete_option( 'blockermd_hub_db_version' );
 delete_option( 'blockermd_identity' );
 delete_option( 'blockermd_trusted' );
+delete_option( 'blockermd_defaults_version' );
 delete_site_transient( 'blockermd_release' );
 wp_clear_scheduled_hook( 'blockermd_prune' );
 wp_clear_scheduled_hook( 'blockermd_report' );

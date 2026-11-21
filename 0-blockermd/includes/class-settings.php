@@ -69,7 +69,10 @@ class BlockerMD_Settings {
 			'bot_block_list'       => '',
 			'bot_limit_list'       => implode(
 				"\n",
-				array( 'SemrushBot', 'AhrefsBot', 'MJ12bot', 'DotBot', 'Baiduspider', 'YandexBot', 'PetalBot', 'Bytespider', 'BLEXBot', 'DataForSeoBot', 'SeekportBot' )
+				array_merge(
+					array( 'SemrushBot', 'AhrefsBot', 'MJ12bot', 'DotBot', 'Baiduspider', 'YandexBot', 'PetalBot', 'Bytespider', 'BLEXBot', 'DataForSeoBot', 'SeekportBot' ),
+					self::training_bots() // AI training crawlers (v0.4.1).
+				)
 			),
 			'bot_limit_per_minute' => 6,
 			'block_bot_oembed'     => 1,
@@ -88,14 +91,77 @@ class BlockerMD_Settings {
 			'log_retention_days'   => 30,
 			'offender_min_hits'    => 10,  // "repeat offender" export threshold (blocks in 24h)
 
-			// Updates from GitHub releases ("owner/repo"). Empty = off.
+			// Updates from GitHub releases ("owner/repo"). Empty = the default repo.
 			'update_repo'          => 'MechaDigital/blockermd',
+			'auto_update'          => 1,   // Install new BlockerMD releases automatically (v0.4.1).
 
 			// Hub reporting. Empty hub_url = the built-in default hub.
 			'report_to_hub'        => 1,
 			'hub_url'              => '',
 			'hub_enabled'          => 0,  // "This site is the hub".
 		);
+	}
+
+	/**
+	 * AI training crawlers (v0.4.1). Rate-limited, not banned: they get 429s past
+	 * the per-minute allowance and never collect 404 points. Search/answer bots
+	 * (OAI-SearchBot, ChatGPT-User, PerplexityBot, Applebot, Googlebot) are not here.
+	 */
+	public static function training_bots() {
+		return array( 'GPTBot', 'ClaudeBot', 'CCBot', 'meta-externalagent' );
+	}
+
+	/**
+	 * Bot names each defaults version adds to sites that already saved settings.
+	 * Each version is merged once, so a name removed by hand later stays removed.
+	 */
+	const DEFAULTS_VERSION        = 1;
+	const DEFAULTS_VERSION_OPTION = 'blockermd_defaults_version';
+
+	private static function default_additions() {
+		return array(
+			1 => array(
+				'bot_limit_list' => self::training_bots(),
+				'auto_update'    => 1,
+			),
+		);
+	}
+
+	/** Cheap on every load: one autoloaded option read; writes only once per version. */
+	public static function maybe_migrate() {
+		$have = (int) get_option( self::DEFAULTS_VERSION_OPTION, 0 );
+		if ( $have >= self::DEFAULTS_VERSION ) {
+			return;
+		}
+		$saved = get_option( self::OPTION, null );
+		if ( is_array( $saved ) ) {
+			foreach ( self::default_additions() as $ver => $adds ) {
+				if ( $ver <= $have ) {
+					continue;
+				}
+				foreach ( $adds as $key => $add ) {
+					if ( ! is_array( $add ) ) {
+						if ( ! array_key_exists( $key, $saved ) ) {
+							$saved[ $key ] = $add;
+						}
+						continue;
+					}
+					$current = isset( $saved[ $key ] ) ? (string) $saved[ $key ] : '';
+					$block   = isset( $saved['bot_block_list'] ) ? (string) $saved['bot_block_list'] : '';
+					foreach ( $add as $name ) {
+						// Skip names already present here, or already on the stricter block list.
+						if ( false !== stripos( $current, $name ) || false !== stripos( $block, $name ) ) {
+							continue;
+						}
+						$current = rtrim( $current ) . ( '' === trim( $current ) ? '' : "\n" ) . $name;
+					}
+					$saved[ $key ] = $current;
+				}
+			}
+			update_option( self::OPTION, $saved, true );
+			self::$cache = null;
+		}
+		update_option( self::DEFAULTS_VERSION_OPTION, self::DEFAULTS_VERSION, true );
 	}
 
 	public static function all() {
@@ -137,6 +203,7 @@ class BlockerMD_Settings {
 		$clean['block_bot_oembed']= empty( $input['block_bot_oembed'] ) ? 0 : 1;
 		$clean['block_user_enum'] = empty( $input['block_user_enum'] ) ? 0 : 1;
 		$clean['trust_on_login']  = empty( $input['trust_on_login'] ) ? 0 : 1;
+		$clean['auto_update']     = empty( $input['auto_update'] ) ? 0 : 1;
 
 		foreach ( array( 'dash_remove_all', 'heartbeat_control', 'wc_admin_trim', 'admin_badge', 'ajax_noaction', 'ajax_log' ) as $key ) {
 			$clean[ $key ] = empty( $input[ $key ] ) ? 0 : 1;

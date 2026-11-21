@@ -187,6 +187,11 @@ class BlockerMD_Gate {
 			return;
 		}
 		$ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+		// Rate-limited crawlers are handled by their allowance; a stale link
+		// they follow shouldn't get them banned (v0.4.1, GPTBot on jewellhardwoods).
+		if ( '' !== $ua && null !== self::match_ua( $ua, BlockerMD_Settings::lines( 'bot_limit_list' ) ) ) {
+			return;
+		}
 		self::add_score( $ip, (int) BlockerMD_Settings::get( 'not_found_points' ), 'not_found', self::request_path(), $ua );
 	}
 

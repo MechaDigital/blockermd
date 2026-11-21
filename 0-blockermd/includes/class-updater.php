@@ -21,6 +21,15 @@ class BlockerMD_Updater {
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( __CLASS__, 'fix_folder_name' ), 10, 4 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache' ), 10, 0 );
+		add_filter( 'auto_update_plugin', array( __CLASS__, 'auto_update' ), 10, 2 );
+	}
+
+	/** Let WordPress install new BlockerMD releases on its own (twice-daily update check). */
+	public static function auto_update( $update, $item ) {
+		if ( is_object( $item ) && isset( $item->plugin ) && self::basename() === $item->plugin ) {
+			return (bool) BlockerMD_Settings::get( 'auto_update' );
+		}
+		return $update;
 	}
 
 	public static function repo() {

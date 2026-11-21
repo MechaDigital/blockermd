@@ -14,7 +14,7 @@ In Settings → BlockerMD → Settings, set **Update source** to this repo (`own
 define( 'BLOCKERMD_UPDATE_REPO', 'owner/blockermd' );
 ```
 
-Updates then show in wp-admin like any other plugin.
+Updates then show in wp-admin like any other plugin. Since v0.4.1, sites install new releases automatically (WordPress's twice-daily update check); turn this off per site under Settings → Housekeeping.
 
 ## Releasing
 1. Bump `Version:` and `BLOCKERMD_VERSION` in `0-blockermd/blockermd.php` and commit.

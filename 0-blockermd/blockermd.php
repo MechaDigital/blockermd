@@ -3,7 +3,7 @@
  * Plugin Name:       BlockerMD
  * Plugin URI:        https://mecha-digital.com/
  * Description:       Performance-first security for MD sites: stops scanner probes, abusive bots and login brute force before WordPress does heavy work, and logs every decision.
- * Version:           0.4.0
+ * Version:           0.4.1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Mecha Digital
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BLOCKERMD_VERSION', '0.4.0' );
+define( 'BLOCKERMD_VERSION', '0.4.1' );
 define( 'BLOCKERMD_FILE', __FILE__ );
 define( 'BLOCKERMD_DIR', __DIR__ );
 define( 'BLOCKERMD_DB_VERSION', 1 );
@@ -36,6 +36,9 @@ require_once BLOCKERMD_DIR . '/includes/class-updater.php';
 require_once BLOCKERMD_DIR . '/includes/class-reporter.php';
 require_once BLOCKERMD_DIR . '/includes/class-hub.php';
 require_once BLOCKERMD_DIR . '/includes/class-hub-admin.php';
+
+// 0. Merge new default lists into sites that already saved settings (once per defaults version).
+BlockerMD_Settings::maybe_migrate();
 
 // 1. Front door: runs right now, while the plugin file loads.
 BlockerMD_Gate::run();

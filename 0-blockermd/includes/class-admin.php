@@ -405,6 +405,7 @@ class BlockerMD_Admin {
 					<td><input type="text" class="regular-text code" id="bmd-update_repo" name="blockermd[update_repo]" value="<?php echo esc_attr( $s['update_repo'] ); ?>" placeholder="MechaDigital/blockermd">
 					<p class="description">New releases show up as normal plugin updates. Can also be set with <code>define( 'BLOCKERMD_UPDATE_REPO', 'owner/repo' );</code> in wp-config.php. Left blank, it uses MechaDigital/blockermd.</p></td>
 				</tr>
+				<?php $check( 'auto_update', 'Install new BlockerMD releases automatically' ); ?>
 			</table>
 
 			<?php submit_button( 'Save settings' ); ?>
