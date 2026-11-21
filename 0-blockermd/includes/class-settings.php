@@ -74,6 +74,9 @@ class BlockerMD_Settings {
 			'bot_limit_per_minute' => 6,
 			'block_bot_oembed'     => 1,
 
+			// User enumeration (v0.4): anonymous /wp-json/wp/v2/users, ?rest_route=/wp/v2/users, ?author=N.
+			'block_user_enum'      => 1,
+
 			// Never touched by any rule. One IP per line.
 			'allow_ips'            => '',
 
@@ -86,7 +89,7 @@ class BlockerMD_Settings {
 			'offender_min_hits'    => 10,  // "repeat offender" export threshold (blocks in 24h)
 
 			// Updates from GitHub releases ("owner/repo"). Empty = off.
-			'update_repo'          => '',
+			'update_repo'          => 'MechaDigital/blockermd',
 
 			// Hub reporting. Empty hub_url = the built-in default hub.
 			'report_to_hub'        => 1,
@@ -132,6 +135,7 @@ class BlockerMD_Settings {
 		$clean['mode']            = ( isset( $input['mode'] ) && 'block' === $input['mode'] ) ? 'block' : 'log';
 		$clean['hide_ocp_widget'] = empty( $input['hide_ocp_widget'] ) ? 0 : 1;
 		$clean['block_bot_oembed']= empty( $input['block_bot_oembed'] ) ? 0 : 1;
+		$clean['block_user_enum'] = empty( $input['block_user_enum'] ) ? 0 : 1;
 		$clean['trust_on_login']  = empty( $input['trust_on_login'] ) ? 0 : 1;
 
 		foreach ( array( 'dash_remove_all', 'heartbeat_control', 'wc_admin_trim', 'admin_badge', 'ajax_noaction', 'ajax_log' ) as $key ) {

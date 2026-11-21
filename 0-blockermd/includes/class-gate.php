@@ -5,9 +5,10 @@
  *
  * Rules, in order:
  *   0. admin-ajax           -> no action: WP's own 400 "0" early; else count (both modes)
- *   1. allow list           -> skip everything
+ *   1. allow list           -> skip everything (incl. signed loopbacks)
  *   2. active ban           -> 403
  *   3. scanner probe path   -> 403 + score
+ *   3b. user enumeration    -> 403 + score (anonymous only)
  *   4. login brute force    -> 429 while locked out
  *   5. crawler controls     -> 403 (block list / bot oEmbed) or 429 (rate limit)
  *   6. odd query strings    -> score only
@@ -23,8 +24,16 @@ class BlockerMD_Gate {
 	// Link-preview services that legitimately use oEmbed (Slack/Discord unfurls etc.).
 	const OEMBED_FRIENDS = '/slackbot|discordbot|twitterbot|facebookexternalhit|linkedinbot|whatsapp|telegrambot|iframely|embedly|skypeuripreview|pinterestbot|redditbot|mastodon/i';
 
+	// Signed header on the site's own loopback requests (Action Scheduler,
+	// cron spawn, Site Health) so they're never scored as outside visitors.
+	const LOOPBACK_HEADER = 'X-BlockerMD-Loopback';
+	const LOOPBACK_MAX_AGE = 300; // seconds
+
 	/** @var string|null */
 	private static $ip = null;
+
+	/** @var bool|null */
+	private static $loopback = null;
 
 	public static function run() {
 		if ( self::should_skip() ) {
@@ -56,6 +65,15 @@ class BlockerMD_Gate {
 		if ( self::is_probe( $path ) ) {
 			self::add_score( $ip, (int) BlockerMD_Settings::get( 'probe_points' ), 'probe', $path, $ua );
 			self::deny( 403, 'probe', $ip, $path, $ua );
+		}
+
+		// 3b. User enumeration. Bots list usernames via the REST users endpoint
+		// or ?author=N redirects, then brute-force them. Each lookup is a full,
+		// uncached WP boot. Visitors with a login cookie are left alone (the
+		// block editor uses this endpoint); WP still checks their permissions.
+		if ( BlockerMD_Settings::get( 'block_user_enum' ) && ! self::has_login_cookie() && self::is_user_enum( $path, $query ) ) {
+			self::add_score( $ip, (int) BlockerMD_Settings::get( 'probe_points' ), 'user_enum', $path, $ua );
+			self::deny( 403, 'user_enum', $ip, $path, $ua );
 		}
 
 		// 4. Login brute force.
@@ -106,6 +124,57 @@ class BlockerMD_Gate {
 		add_action( 'wp_login_failed', array( __CLASS__, 'on_login_failed' ) );
 		add_action( 'xmlrpc_login_error', array( __CLASS__, 'on_login_failed' ) );
 		add_action( 'wp_login', array( __CLASS__, 'on_admin_login' ), 10, 2 );
+		add_filter( 'http_request_args', array( __CLASS__, 'sign_loopback' ), 10, 2 );
+	}
+
+	/**
+	 * Add a short-lived HMAC to outgoing requests aimed at this site's own
+	 * host. Keyed with AUTH_KEY from wp-config, so it can't be forged from
+	 * outside and needs no IP detection (works behind Cloudflare too).
+	 */
+	public static function sign_loopback( $args, $url ) {
+		$key  = self::loopback_key();
+		$host = strtolower( (string) parse_url( (string) $url, PHP_URL_HOST ) );
+		if ( '' === $key || '' === $host ) {
+			return $args;
+		}
+		$own = array(
+			strtolower( (string) parse_url( home_url(), PHP_URL_HOST ) ),
+			strtolower( (string) parse_url( site_url(), PHP_URL_HOST ) ),
+		);
+		if ( ! in_array( $host, $own, true ) ) {
+			return $args;
+		}
+		$ts = (string) time();
+		if ( ! isset( $args['headers'] ) || ! is_array( $args['headers'] ) ) {
+			$args['headers'] = array();
+		}
+		$args['headers'][ self::LOOPBACK_HEADER ] = $ts . '.' . hash_hmac( 'sha256', 'bmd-loopback|' . $ts . '|' . $host, $key );
+		return $args;
+	}
+
+	/** True when this request carries a valid loopback signature. */
+	public static function is_loopback() {
+		if ( null !== self::$loopback ) {
+			return self::$loopback;
+		}
+		self::$loopback = false;
+		$key = self::loopback_key();
+		$sig = isset( $_SERVER['HTTP_X_BLOCKERMD_LOOPBACK'] ) ? (string) $_SERVER['HTTP_X_BLOCKERMD_LOOPBACK'] : '';
+		if ( '' === $key || ! preg_match( '/^(\d{9,11})\.([a-f0-9]{64})$/', $sig, $m ) ) {
+			return false;
+		}
+		if ( abs( time() - (int) $m[1] ) > self::LOOPBACK_MAX_AGE ) {
+			return false;
+		}
+		$host = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( preg_replace( '/:\d+$/', '', (string) $_SERVER['HTTP_HOST'] ) ) : '';
+		$want = hash_hmac( 'sha256', 'bmd-loopback|' . $m[1] . '|' . $host, $key );
+		self::$loopback = hash_equals( $want, $m[2] );
+		return self::$loopback;
+	}
+
+	private static function loopback_key() {
+		return ( defined( 'AUTH_KEY' ) && is_string( AUTH_KEY ) && strlen( AUTH_KEY ) >= 32 ) ? AUTH_KEY : '';
 	}
 
 	/** 404s add to the client's score. */
@@ -273,6 +342,9 @@ class BlockerMD_Gate {
 		if ( self::is_private_ip( $ip ) ) {
 			return true; // Loopback health checks, server-side cron, etc.
 		}
+		if ( self::is_loopback() ) {
+			return true; // The site calling itself from the server's public IP.
+		}
 		if ( BlockerMD_Settings::get( 'trust_on_login' ) && isset( self::trusted_ips()[ $ip ] ) ) {
 			return true;
 		}
@@ -348,6 +420,31 @@ class BlockerMD_Gate {
 		}
 		// Legacy-style "?url=...&format=xml|json" requests.
 		return isset( $q['url'], $q['format'] ) && in_array( strtolower( (string) $q['format'] ), array( 'xml', 'json' ), true );
+	}
+
+	private static function is_user_enum( $path, $query ) {
+		if ( preg_match( '#/wp-json/wp/v2/users(?:/|$)#i', $path ) ) {
+			return true;
+		}
+		if ( '' === $query ) {
+			return false;
+		}
+		parse_str( $query, $q );
+		if ( isset( $q['rest_route'] ) && preg_match( '#^/wp/v2/users(?:/|$)#i', (string) $q['rest_route'] ) ) {
+			return true;
+		}
+		// ?author=1 redirects to /author/<username>/. Only on the front end.
+		return isset( $q['author'] ) && is_scalar( $q['author'] ) && preg_match( '/^\d+$/', trim( (string) $q['author'] ) )
+			&& false === stripos( $path, '/wp-admin' );
+	}
+
+	private static function has_login_cookie() {
+		foreach ( array_keys( $_COOKIE ) as $name ) {
+			if ( 0 === strpos( (string) $name, 'wordpress_logged_in_' ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static function is_odd_query( $path, $query ) {

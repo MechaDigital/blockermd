@@ -14,6 +14,7 @@ class BlockerMD_Updater {
 	const SLUG      = 'blockermd';
 	const ASSET     = 'blockermd.zip';
 	const CACHE_KEY = 'blockermd_release';
+	const DEFAULT_REPO = 'MechaDigital/blockermd';
 
 	public static function register_hooks() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_update' ) );
@@ -26,7 +27,8 @@ class BlockerMD_Updater {
 		if ( defined( 'BLOCKERMD_UPDATE_REPO' ) && BLOCKERMD_UPDATE_REPO ) {
 			return (string) BLOCKERMD_UPDATE_REPO;
 		}
-		return (string) BlockerMD_Settings::get( 'update_repo' );
+		$repo = (string) BlockerMD_Settings::get( 'update_repo' );
+		return '' !== $repo ? $repo : self::DEFAULT_REPO;
 	}
 
 	private static function basename() {

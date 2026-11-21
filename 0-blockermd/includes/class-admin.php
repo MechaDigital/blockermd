@@ -73,7 +73,7 @@ class BlockerMD_Admin {
 		check_admin_referer( 'blockermd_save' );
 		$input = isset( $_POST['blockermd'] ) && is_array( $_POST['blockermd'] ) ? $_POST['blockermd'] : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- sanitized in save().
 		BlockerMD_Settings::save( $input );
-		wp_safe_redirect( admin_url( 'options-general.php?page=' . self::SLUG . '&saved=1' ) );
+		wp_safe_redirect( admin_url( 'options-general.php?page=' . self::SLUG . '&tab=settings&saved=1' ) );
 		exit;
 	}
 
@@ -377,6 +377,7 @@ class BlockerMD_Admin {
 				<?php $area( 'bot_limit_list', 'Rate-limit (user-agent contains)', 'One per line. Each bot gets its own per-minute allowance across all of its IPs.' ); ?>
 				<?php $num( 'bot_limit_per_minute', 'Requests per minute per bot' ); ?>
 				<?php $check( 'block_bot_oembed', 'Block bots on oEmbed endpoints' ); ?>
+				<?php $check( 'block_user_enum', 'Block user enumeration (/wp-json/wp/v2/users, ?author=N) for visitors who are not logged in' ); ?>
 			</table>
 
 			<h2>Hub reporting</h2>
@@ -401,8 +402,8 @@ class BlockerMD_Admin {
 				<?php $num( 'offender_min_hits', 'Repeat-offender threshold (requests in 24h)' ); ?>
 				<tr>
 					<th scope="row"><label for="bmd-update_repo">Update source (GitHub owner/repo)</label></th>
-					<td><input type="text" class="regular-text code" id="bmd-update_repo" name="blockermd[update_repo]" value="<?php echo esc_attr( $s['update_repo'] ); ?>" placeholder="owner/blockermd">
-					<p class="description">New releases show up as normal plugin updates. Can also be set with <code>define( 'BLOCKERMD_UPDATE_REPO', 'owner/repo' );</code> in wp-config.php.</p></td>
+					<td><input type="text" class="regular-text code" id="bmd-update_repo" name="blockermd[update_repo]" value="<?php echo esc_attr( $s['update_repo'] ); ?>" placeholder="MechaDigital/blockermd">
+					<p class="description">New releases show up as normal plugin updates. Can also be set with <code>define( 'BLOCKERMD_UPDATE_REPO', 'owner/repo' );</code> in wp-config.php. Left blank, it uses MechaDigital/blockermd.</p></td>
 				</tr>
 			</table>
 
