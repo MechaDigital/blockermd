@@ -143,7 +143,7 @@ class BlockerMD_Hub_Admin {
 							<td style="<?php echo $late ? 'color:#b32d2e;font-weight:600' : ''; ?>"><?php echo esc_html( self::ago( $s->last_report ) ); ?></td>
 							<td style="text-align:right"><?php echo esc_html( number_format_i18n( (int) $s->blocks_24h ) ); ?></td>
 							<td style="text-align:right"><?php echo esc_html( number_format_i18n( (int) $s->blocks_7d ) ); ?></td>
-							<td><?php self::button( $s->site_uuid, 'remove', 'Remove', 'button-link', 'Remove this site and its history? It will ask to join again on its next report.' ); ?></td>
+							<td style="white-space:nowrap"><?php self::login_link( $s->home_url ); ?> <?php self::button( $s->site_uuid, 'remove', 'Remove', 'button-link', 'Remove this site and its history? It will ask to join again on its next report.' ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>
@@ -264,6 +264,21 @@ class BlockerMD_Hub_Admin {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Plain "Log in" link to a site's /wp-admin/ (v0.4.2). Logged out, WordPress
+	 * redirects to the login page; logged in, it opens the dashboard; it also
+	 * works where the login URL was renamed. No tokens, no auto-login: the hub
+	 * never sends credentials or commands to client sites. HTTPS only.
+	 */
+	private static function login_link( $home_url ) {
+		$home = trim( (string) $home_url );
+		if ( 'https' !== strtolower( (string) wp_parse_url( $home, PHP_URL_SCHEME ) ) || ! wp_parse_url( $home, PHP_URL_HOST ) ) {
+			return;
+		}
+		$url = trailingslashit( untrailingslashit( $home ) ) . 'wp-admin/';
+		echo '<a class="button button-small" href="' . esc_url( $url, array( 'https' ) ) . '" target="_blank" rel="noopener noreferrer">Log in</a>';
 	}
 
 	private static function tile( $label, $value, $color = '' ) {

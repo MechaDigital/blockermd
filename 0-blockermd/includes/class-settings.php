@@ -80,8 +80,8 @@ class BlockerMD_Settings {
 			// User enumeration (v0.4): anonymous /wp-json/wp/v2/users, ?rest_route=/wp/v2/users, ?author=N.
 			'block_user_enum'      => 1,
 
-			// Never touched by any rule. One IP per line.
-			'allow_ips'            => '',
+			// Never touched by any rule. One IP or CIDR per line; lines starting with # are notes.
+			'allow_ips'            => implode( "\n", array_merge( array( '# Cloudways Site Manager (v0.4.2)' ), self::site_manager_ips() ) ),
 
 			// Trust the IP of any administrator who logs in successfully.
 			'trust_on_login'       => 1,
@@ -112,10 +112,19 @@ class BlockerMD_Settings {
 	}
 
 	/**
+	 * Cloudways Site Manager (v0.4.2). It calls in from these IPs (bvadm
+	 * admin-ajax action, /wp-load.php) and was picking up odd-query ban points.
+	 * Allow-listed by default; removing one by hand keeps it removed.
+	 */
+	public static function site_manager_ips() {
+		return array( '178.156.136.36', '5.161.69.178', '5.161.106.94' );
+	}
+
+	/**
 	 * Bot names each defaults version adds to sites that already saved settings.
 	 * Each version is merged once, so a name removed by hand later stays removed.
 	 */
-	const DEFAULTS_VERSION        = 1;
+	const DEFAULTS_VERSION        = 2;
 	const DEFAULTS_VERSION_OPTION = 'blockermd_defaults_version';
 
 	private static function default_additions() {
@@ -123,6 +132,9 @@ class BlockerMD_Settings {
 			1 => array(
 				'bot_limit_list' => self::training_bots(),
 				'auto_update'    => 1,
+			),
+			2 => array(
+				'allow_ips' => self::site_manager_ips(),
 			),
 		);
 	}
@@ -148,9 +160,15 @@ class BlockerMD_Settings {
 					}
 					$current = isset( $saved[ $key ] ) ? (string) $saved[ $key ] : '';
 					$block   = isset( $saved['bot_block_list'] ) ? (string) $saved['bot_block_list'] : '';
+					$present = array_map( 'trim', preg_split( '/\r\n|\r|\n/', $current ) );
 					foreach ( $add as $name ) {
-						// Skip names already present here, or already on the stricter block list.
-						if ( false !== stripos( $current, $name ) || false !== stripos( $block, $name ) ) {
+						if ( 'allow_ips' === $key ) {
+							// IPs: exact line match only (1.2.3.4 must not match 11.2.3.45).
+							if ( in_array( $name, $present, true ) ) {
+								continue;
+							}
+						} elseif ( false !== stripos( $current, $name ) || false !== stripos( $block, $name ) ) {
+							// Bot names already present here, or already on the stricter block list.
 							continue;
 						}
 						$current = rtrim( $current ) . ( '' === trim( $current ) ? '' : "\n" ) . $name;
